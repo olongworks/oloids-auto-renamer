@@ -384,6 +384,105 @@ class ActionButton(QPushButton):
             painter.drawLine(QPointF(x - 3, y + 2), QPointF(x + 3, y + 2))
         painter.restore()
 
+class ToggleSwitch(QPushButton):
+    def __init__(self, checked: bool = False, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setCheckable(True)
+        self.setChecked(checked)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFixedSize(38, 20)
+        self.setFlat(True)
+        self._hover = 0.0
+        self._position = 1.0 if checked else 0.0
+        self._hover_animation = QVariantAnimation(self)
+        self._hover_animation.setDuration(160)
+        self._hover_animation.setEasingCurve(QEasingCurve.OutCubic)
+        self._hover_animation.valueChanged.connect(self._set_hover)
+        self._toggle_animation = QVariantAnimation(self)
+        self._toggle_animation.setDuration(180)
+        self._toggle_animation.setEasingCurve(QEasingCurve.OutCubic)
+        self._toggle_animation.valueChanged.connect(self._set_position)
+        self.toggled.connect(self._animate_toggle)
+
+    def sizeHint(self) -> QSize:
+        return QSize(38, 20)
+
+    def enterEvent(self, event) -> None:  # noqa: ANN001
+        self._animate_hover(1.0)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:  # noqa: ANN001
+        self._animate_hover(0.0)
+        super().leaveEvent(event)
+
+    def _animate_hover(self, target: float) -> None:
+        self._hover_animation.stop()
+        self._hover_animation.setStartValue(self._hover)
+        self._hover_animation.setEndValue(target)
+        self._hover_animation.start()
+
+    def _set_hover(self, value: float) -> None:
+        self._hover = float(value)
+        self.update()
+
+    def _animate_toggle(self, checked: bool) -> None:
+        self._toggle_animation.stop()
+        self._toggle_animation.setStartValue(self._position)
+        self._toggle_animation.setEndValue(1.0 if checked else 0.0)
+        self._toggle_animation.start()
+
+    def _set_position(self, value: float) -> None:
+        self._position = float(value)
+        self.update()
+    def set_visual_checked(self, checked: bool) -> None:
+        self.blockSignals(True)
+        self.setChecked(checked)
+        self.blockSignals(False)
+        self._animate_toggle(checked)
+
+
+    def paintEvent(self, event) -> None:  # noqa: ANN001
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        radius = rect.height() / 2
+
+        off_track = QColor(255, 255, 255, 16 + int(self._hover * 18))
+        on_track = QColor(255, 255, 255, 72 + int(self._hover * 32))
+        stroke = QColor(255, 255, 255, 34 + int(self._hover * 40))
+        glow = QColor(255, 255, 255, 24 + int((self._hover + self._position) * 34))
+        knob = QColor("#f6f7f9") if self._position >= 0.5 else QColor(255, 255, 255, 176)
+
+        painter.setPen(Qt.NoPen)
+        if self._position > 0.0:
+            painter.setBrush(glow)
+            painter.drawRoundedRect(rect.adjusted(-1.2, -1.2, 1.2, 1.2), radius + 1.2, radius + 1.2)
+
+        painter.setPen(QPen(stroke, 1.0))
+        painter.setBrush(self._mix(off_track, on_track, self._position))
+        painter.drawRoundedRect(rect, radius, radius)
+
+        knob_size = rect.height() - 4
+        min_x = rect.left() + 2
+        max_x = rect.right() - knob_size - 2
+        knob_x = min_x + ((max_x - min_x) * self._position)
+        knob_rect = QRectF(knob_x, rect.top() + 2, knob_size, knob_size)
+
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(255, 255, 255, 18 + int(self._hover * 20)))
+        painter.drawEllipse(knob_rect.adjusted(-0.8, -0.8, 0.8, 0.8))
+        painter.setBrush(knob)
+        painter.drawEllipse(knob_rect)
+
+    @staticmethod
+    def _mix(start: QColor, end: QColor, amount: float) -> QColor:
+        return QColor(
+            int(start.red() + (end.red() - start.red()) * amount),
+            int(start.green() + (end.green() - start.green()) * amount),
+            int(start.blue() + (end.blue() - start.blue()) * amount),
+            int(start.alpha() + (end.alpha() - start.alpha()) * amount),
+        )
+
 class ActivityPreviewPanel(QFrame):
     IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
     VIDEO_SUFFIXES = {".mp4", ".mov"}
@@ -776,8 +875,8 @@ class MainWindow(QMainWindow):
         row.addWidget(delete_button)
         row.addStretch()
 
-        self.projects_table = QTableWidget(0, 6)
-        self.projects_table.setHorizontalHeaderLabels(["ID", "Name", "Output Path", "Pattern", "Active", "Fallback"])
+        self.projects_table = QTableWidget(0, 5)
+        self.projects_table.setHorizontalHeaderLabels(["ID", "Name", "Output Path", "Pattern", "Enabled"])
         self._style_table(self.projects_table)
         self._configure_projects_table()
         section.layout().addLayout(row)
@@ -998,7 +1097,7 @@ class MainWindow(QMainWindow):
         header = table.horizontalHeader()
         header.setStretchLastSection(False)
         header.setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        table.verticalHeader().setDefaultSectionSize(40)
+        table.verticalHeader().setDefaultSectionSize(42)
         table.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
         table.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
 
@@ -1009,7 +1108,6 @@ class MainWindow(QMainWindow):
         header.setSectionResizeMode(2, QHeaderView.Stretch)
         header.setSectionResizeMode(3, QHeaderView.Stretch)
         header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
 
     def _configure_rules_table(self) -> None:
         header = self.rules_table.horizontalHeader()
@@ -1068,6 +1166,7 @@ class MainWindow(QMainWindow):
 
     def refresh_projects(self) -> None:
         projects = self.app_service.get_projects()
+        self._project_toggle_widgets = {}
         self.projects_table.setRowCount(len(projects))
         for row, project in enumerate(projects):
             values = [
@@ -1075,11 +1174,55 @@ class MainWindow(QMainWindow):
                 project.name,
                 project.output_path,
                 project.naming_pattern,
-                "Yes" if project.is_active else "No",
-                "Yes" if project.fallback_unsorted else "No",
             ]
             for column, value in enumerate(values):
                 self.projects_table.setItem(row, column, QTableWidgetItem(value))
+            toggle_widget = self._create_project_toggle(project)
+            self.projects_table.setCellWidget(row, 4, toggle_widget)
+
+    def _create_project_toggle(self, project: ProjectPreset) -> QWidget:
+        wrapper = QWidget()
+        wrapper.setFixedSize(52, 28)
+        layout = QHBoxLayout(wrapper)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setAlignment(Qt.AlignCenter)
+        toggle = ToggleSwitch(project.is_active)
+        toggle.setToolTip("Enable this project")
+        self._project_toggle_widgets[project.id] = toggle
+        toggle.toggled.connect(lambda enabled, project_id=project.id: self._toggle_project(project_id, enabled))
+        layout.addWidget(toggle)
+        return wrapper
+
+    def _toggle_project(self, project_id: int | None, enabled: bool) -> None:
+        if project_id is None:
+            return
+        project = next((item for item in self.app_service.get_projects() if item.id == project_id), None)
+        if project is None:
+            return
+        if not enabled and project.is_active:
+            QMessageBox.information(self, "Project", "Enable another project first.")
+            self.refresh_projects()
+            return
+        if enabled:
+            for other_project in self.app_service.get_projects():
+                if other_project.id != project_id and other_project.is_active:
+                    other_toggle = self._project_toggle_widgets.get(other_project.id)
+                    if other_toggle is not None:
+                        other_toggle.set_visual_checked(False)
+                    break
+        QTimer.singleShot(200, lambda project=project, enabled=enabled: self._persist_project_toggle(project, enabled))
+
+    def _persist_project_toggle(self, project: ProjectPreset, enabled: bool) -> None:
+        updated = ProjectPreset(
+            id=project.id,
+            name=project.name,
+            output_path=project.output_path,
+            naming_pattern=project.naming_pattern,
+            default_tool=project.default_tool,
+            is_active=enabled,
+            fallback_unsorted=enabled,
+        )
+        self.app_service.save_project(updated)
 
     def refresh_rules(self) -> None:
         rules = self.app_service.get_rules()
@@ -1285,8 +1428,8 @@ class MainWindow(QMainWindow):
         if project is None:
             QMessageBox.information(self, "Project", "Select a project first.")
             return
-        if project.fallback_unsorted:
-            QMessageBox.warning(self, "Project", "The fallback project cannot be deleted.")
+        if project.is_active:
+            QMessageBox.warning(self, "Project", "Disable this project by enabling another project first.")
             return
         self.app_service.delete_project(project.id)
 
@@ -1329,6 +1472,14 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Undo", message)
         else:
             QMessageBox.warning(self, "Undo", message)
+
+
+
+
+
+
+
+
 
 
 

@@ -95,10 +95,8 @@ class ProjectDialog(QDialog):
 
         self.pattern_edit = QLineEdit(project.naming_pattern if project else "{mmdd}_{project}_{seq}")
         self.default_tool_edit = QLineEdit(project.default_tool if project and project.default_tool else "")
-        self.active_checkbox = QCheckBox("Active project")
-        self.active_checkbox.setChecked(project.is_active if project else False)
-        self.unsorted_checkbox = QCheckBox("Fallback project")
-        self.unsorted_checkbox.setChecked(project.fallback_unsorted if project else False)
+        self.enabled_checkbox = QCheckBox("Enabled project")
+        self.enabled_checkbox.setChecked(project.is_active if project else True)
 
         form = QFormLayout()
         form.setHorizontalSpacing(20)
@@ -107,8 +105,7 @@ class ProjectDialog(QDialog):
         form.addRow("Output Path", output_widget)
         form.addRow("Naming Pattern", self.pattern_edit)
         form.addRow("Default Tool", self.default_tool_edit)
-        form.addRow("", self.active_checkbox)
-        form.addRow("", self.unsorted_checkbox)
+        form.addRow("", self.enabled_checkbox)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
@@ -134,8 +131,8 @@ class ProjectDialog(QDialog):
             output_path=self.output_path_edit.text().strip(),
             naming_pattern=self.pattern_edit.text().strip(),
             default_tool=self.default_tool_edit.text().strip() or None,
-            is_active=self.active_checkbox.isChecked(),
-            fallback_unsorted=self.unsorted_checkbox.isChecked(),
+            is_active=self.enabled_checkbox.isChecked(),
+            fallback_unsorted=self.enabled_checkbox.isChecked(),
         )
 
 
@@ -182,6 +179,7 @@ class RuleDialog(QDialog):
             priority=self.priority_spin.value(),
             is_active=self.active_checkbox.isChecked(),
         )
+
 
 
 

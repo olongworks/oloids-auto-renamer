@@ -25,7 +25,7 @@ class AppRepository:
                 """
                 SELECT id, name, output_path, naming_pattern, default_tool, is_active, fallback_unsorted
                 FROM project_presets
-                ORDER BY fallback_unsorted DESC, is_active DESC, name ASC
+                ORDER BY id ASC
                 """
             ).fetchall()
         return [
@@ -43,8 +43,9 @@ class AppRepository:
 
     def save_project(self, project: ProjectPreset) -> None:
         with self._connect() as connection:
-            if project.is_active:
-                connection.execute("UPDATE project_presets SET is_active = 0")
+            is_enabled = bool(project.is_active)
+            if is_enabled:
+                connection.execute("UPDATE project_presets SET is_active = 0, fallback_unsorted = 0")
 
             if project.id is None:
                 connection.execute(
@@ -58,8 +59,8 @@ class AppRepository:
                         project.output_path,
                         project.naming_pattern,
                         project.default_tool,
-                        int(project.is_active),
-                        int(project.fallback_unsorted),
+                        int(is_enabled),
+                        int(is_enabled),
                     ),
                 )
             else:
@@ -74,8 +75,8 @@ class AppRepository:
                         project.output_path,
                         project.naming_pattern,
                         project.default_tool,
-                        int(project.is_active),
-                        int(project.fallback_unsorted),
+                        int(is_enabled),
+                        int(is_enabled),
                         project.id,
                     ),
                 )
@@ -83,7 +84,7 @@ class AppRepository:
     def delete_project(self, project_id: int) -> None:
         with self._connect() as connection:
             connection.execute(
-                "DELETE FROM project_presets WHERE id = ? AND fallback_unsorted = 0",
+                "DELETE FROM project_presets WHERE id = ? AND is_active = 0",
                 (project_id,),
             )
 
@@ -251,4 +252,6 @@ class AppRepository:
             error_message=row["error_message"],
             undone_at=row["undone_at"],
         )
+
+
 
