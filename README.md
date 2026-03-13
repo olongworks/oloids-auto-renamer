@@ -49,6 +49,66 @@ Build output:
 dist\OAR\OAR.exe
 ```
 
+
+
+## Download Ready-Made macOS Build
+
+If you want other Mac users to download and install OAR directly from GitHub:
+
+1. Push this repository to GitHub
+2. Create a tag like `v0.1.0`
+3. Push the tag
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+GitHub Actions will build:
+
+- `OAR-macOS.dmg`
+- `OAR-macOS.zip`
+
+You can then share the files from the GitHub release page.
+
+Recommended Mac install flow:
+
+1. Download `OAR-macOS.dmg`
+2. Open the DMG
+3. Drag `OAR.app` into `Applications`
+4. On first launch, right-click `OAR.app` and choose `Open`
+
+Note:
+
+- this works best for quick sharing
+- Gatekeeper may still warn because the app is not yet signed and notarized
+## Build macOS App
+
+Build the macOS `.app` bundle on a Mac machine.
+
+```bash
+chmod +x build_macos.sh
+./build_macos.sh
+```
+
+If your virtual environment uses a different Python path:
+
+```bash
+./build_macos.sh /path/to/venv/bin/python
+```
+
+Build output:
+
+```text
+dist/OAR.app
+```
+
+Notes:
+
+- macOS apps must be built on macOS
+- the script generates `assets/oar.icns` from `assets/oar.png` automatically
+- for sharing, compress `dist/OAR.app` into a `.zip`
+- Gatekeeper may warn on another Mac unless the app is signed and notarized
 ## Lightweight Packaging Notes
 
 The current build script trims a few unnecessary pieces for distribution:
@@ -67,3 +127,5 @@ Recent cleanup included:
 - reducing background render cost
 - removing the shell drop shadow effect
 - simplifying the main UI hierarchy for easier maintenance
+
+

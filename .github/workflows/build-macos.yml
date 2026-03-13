@@ -1,0 +1,50 @@
+﻿name: Build macOS App
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Create virtual environment
+        run: python3 -m venv .venv
+
+      - name: Install dependencies
+        run: |
+          source .venv/bin/activate
+          pip install -r requirements.txt
+
+      - name: Build macOS bundle
+        run: |
+          chmod +x build_macos.sh
+          ./build_macos.sh .venv/bin/python
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: OAR-macOS
+          path: |
+            dist/OAR.app
+            dist/OAR-macOS.zip
+            dist/OAR-macOS.dmg
+
+      - name: Attach release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/OAR-macOS.zip
+            dist/OAR-macOS.dmg
